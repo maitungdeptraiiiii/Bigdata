@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Game Stream Dashboard (Simple)</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <div class="container">
+      <h1>Live Game Stream Dashboard</h1>
+      <div id="stats" class="stats">
+        <div class="card"><h3>Events/sec</h3><div id="events_per_sec">-</div></div>
+        <div class="card"><h3>Active Players</h3><div id="active_players">-</div></div>
+        <div class="card"><h3>Purchases/5min</h3><div id="purchases_5min">-</div></div>
+        <div class="card"><h3>Open Sessions</h3><div id="open_sessions">-</div></div>
+      </div>
+
+      <h2>Recent Events (live)</h2>
+      <table id="events_table">
+        <thead><tr><th>Time</th><th>Player</th><th>Event</th><th>Genre</th><th>Meta</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <script src="/static/dashboard.js"></script>
+  </body>
+</html>
