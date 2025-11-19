@@ -1,11 +1,16 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, window, count
+from pyspark.sql.functions import from_json, col, window, count, to_timestamp
 from pyspark.sql.types import *
 import redis
 import json
+import os
+
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+REDIS_KEY = os.environ.get("REDIS_KEY", "live_metrics")
 
 # Redis client
-redis_client = redis.Redis(host="redis", port=6379, db=0)
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
 
 # Spark Session
 spark = (SparkSession.builder
@@ -13,14 +18,19 @@ spark = (SparkSession.builder
          .getOrCreate())
 spark.sparkContext.setLogLevel("WARN")
 
-# Schema for Kafka JSON
+# Schema for Kafka JSON (timestamp as string -> convert later)
 event_schema = StructType([
     StructField("event_id", StringType()),
     StructField("player_id", IntegerType()),
     StructField("event_type", StringType()),
-    StructField("game_genre", StringType()),
-    StructField("value", DoubleType()),
-    StructField("timestamp", TimestampType())
+    StructField("location", StringType()),
+    StructField("device", StringType()),
+    StructField("session_duration", IntegerType()),
+    StructField("item", StringType()),
+    StructField("amount", DoubleType()),
+    StructField("new_level", IntegerType()),
+    StructField("achievement", StringType()),
+    StructField("timestamp", StringType())
 ])
 
 # Read stream from Kafka
@@ -31,12 +41,24 @@ raw_df = (spark.readStream
     .option("startingOffsets", "latest")
     .load())
 
-json_df = raw_df.selectExpr("CAST(value AS STRING)")
-parsed_df = json_df.select(from_json(col("value"), event_schema).alias("data")).select("data.*")
+json_df = raw_df.selectExpr("CAST(value AS STRING) as value")
+parsed = json_df.select(from_json(col("value"), event_schema).alias("data")).select("data.*")
+
+# convert timestamp string to timestamp type (assumes ISO millis e.g. 2023-01-01T00:00:00.123Z)
+parsed_df = parsed.withColumn("timestamp_ts", to_timestamp(col("timestamp"), "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+
+# fallback: if milliseconds not present, try without .SSS
+from pyspark.sql.functions import when
+parsed_df = parsed_df.withColumn(
+    "timestamp_ts",
+    when(col("timestamp_ts").isNull(), to_timestamp(col("timestamp"), "yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    .otherwise(col("timestamp_ts"))
+)
 
 # Example metric: count events in 10s window
 metric_df = (parsed_df
-    .groupBy(window(col("timestamp"), "10 seconds"))
+    .withWatermark("timestamp_ts", "30 seconds")
+    .groupBy(window(col("timestamp_ts"), "10 seconds"))
     .agg(count("event_id").alias("event_count")))
 
 # Function to write metrics to Redis
@@ -46,11 +68,15 @@ def write_to_redis(batch_df, batch_id):
         payload = {
             "window_start": str(r["window"].start),
             "window_end": str(r["window"].end),
-            "event_count": r["event_count"]
+            "event_count": int(r["event_count"])
         }
-        redis_client.publish("metrics", json.dumps(payload))
-        redis_client.set("latest_metrics", json.dumps(payload))
-        print("Pushed to Redis:", payload)
+        # push both publish and set for webui
+        try:
+            redis_client.publish("metrics", json.dumps(payload))
+            redis_client.set(REDIS_KEY, json.dumps(payload))
+            print("Pushed to Redis:", payload)
+        except Exception as e:
+            print("Redis write error:", e)
 
 # Start Streaming Query
 query = (metric_df.writeStream
