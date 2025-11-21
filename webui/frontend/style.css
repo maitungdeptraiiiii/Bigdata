@@ -1,7 +1,45 @@
-body { font-family: Arial, sans-serif; background:#f6f8fa; color:#111; }
-.container { max-width:1000px; margin:20px auto; padding:16px; }
-.stats { display:flex; gap:12px; margin-bottom:16px; }
-.card { background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.08); flex:1; text-align:center }
-#events_table { width:100%; border-collapse:collapse; background:#fff; }
-#events_table th, #events_table td { padding:8px; border-bottom:1px solid #eee; }
-#events_table thead { background:#fafafa }
+body {
+  font-family: Arial;
+  background: #1e1e1e;
+  color: #fff;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1400px;
+  margin: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.card {
+  background: #2b2b2b;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.events-list {
+  height: 450px;
+  overflow-y: scroll;
+  background: #111;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.event-item {
+  padding: 6px;
+  margin-bottom: 6px;
+  background: #333;
+  border-radius: 4px;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}

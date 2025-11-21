@@ -1,48 +1,80 @@
-from flask import Flask, Response, render_template, send_from_directory
-import time
-import json
-import redis
-import os
+from flask import Flask, jsonify, request
+from redis_client import (
+    get_live_metrics,
+    get_recent_events,
+    get_player_state,
+    update_player_state,
+    load_player_profiles,
+)
 
-REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
-REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
-REDIS_KEY = os.environ.get("REDIS_KEY", "live_metrics")
+app = Flask(__name__)
 
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+# Load static player info
+PROFILES = load_player_profiles()
 
-app = Flask(__name__, static_folder='../frontend', template_folder='../frontend')
+# ────────────────────────────────────────────────
+# API: LIVE METRICS FOR DASHBOARD
+# ────────────────────────────────────────────────
+@app.route("/api/live_metrics")
+def api_live_metrics():
+    return jsonify(get_live_metrics())
 
-@app.route('/')
+
+# ────────────────────────────────────────────────
+# API: RECENT EVENTS
+# ────────────────────────────────────────────────
+@app.route("/api/recent_events")
+def api_recent_events():
+    events = get_recent_events(30)
+    return jsonify(events)
+
+
+# ────────────────────────────────────────────────
+# API: PLAYER LIST
+# ────────────────────────────────────────────────
+@app.route("/api/players")
+def api_players():
+    ids = list(PROFILES.keys())
+    return jsonify(ids)
+
+
+# ────────────────────────────────────────────────
+# API: PLAYER DETAILS (full fusion)
+# ────────────────────────────────────────────────
+@app.route("/api/player/<pid>")
+def api_player(pid):
+    pid = int(pid)
+
+    if pid not in PROFILES:
+        return jsonify({"error": "Player not found"}), 404
+
+    base = PROFILES[pid]
+    live = get_player_state(pid)
+
+    merged = base.copy()
+    merged.update(live)
+
+    # Determine Active state
+    last_ts = live.get("last_event_ts")
+    if last_ts:
+        from datetime import datetime, timedelta
+        last = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
+        merged["active"] = (datetime.utcnow() - last) < timedelta(seconds=30)
+    else:
+        merged["active"] = False
+
+    # Engagement is predicted via spark streaming + XGBoost model (no need to update here)
+
+    return jsonify(merged)
+
+
+# ────────────────────────────────────────────────
+# HOME
+# ────────────────────────────────────────────────
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return jsonify({"status": "ok", "message": "WebUI backend running"})
 
 
-def event_stream(poll_interval=1.0):
-    last = None
-    while True:
-        try:
-            raw = r.get(REDIS_KEY)
-            if raw:
-                if raw != last:
-                    last = raw
-                    yield f"data: {raw}\n\n"
-            time.sleep(poll_interval)
-        except GeneratorExit:
-            break
-        except Exception:
-            time.sleep(poll_interval)
-
-
-@app.route('/metrics/stream')
-def stream_metrics():
-    headers = {"Content-Type": "text/event-stream", "Cache-Control": "no-cache"}
-    return Response(event_stream(), headers=headers)
-
-
-@app.route('/static/<path:filename>')
-def static_files(filename):
-    return send_from_directory(app.static_folder, filename)
-
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=9000, debug=False)
