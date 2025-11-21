@@ -46,14 +46,16 @@ services:
   producer:
     build: ./producer
     container_name: producer
-    depends_on:
-      - kafka
-    volumes:
-      - ./data:/data
     environment:
       - KAFKA_BOOTSTRAP=kafka:9092
-    restart: unless-stopped
-
+      - KAFKA_TOPIC=game_events
+      - CSV_FILE=/data/online_gaming_behavior_dataset.csv
+      - PYTHONUNBUFFERED=1  # <--- THÊM DÒNG NÀY
+    volumes:
+      - ./data:/data
+      - ./producer:/app  # Mount code để sửa lỗi nhanh mà không cần rebuild
+    depends_on:
+      - kafka
   # ===============================
   #  SPARK STREAMING
   # ===============================

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Detail</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/frontend/style.css">
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <a href="/" class="home-btn">← Back to Dashboard</a>
+        <h1 style="font-size: 1rem; color: #94a3b8;">PLAYER ANALYTICS</h1>
+    </div>
+
+    <div id="loading" style="text-align:center; margin-top:50px;">Loading data...</div>
+
+    <div id="main-content" style="display:none;">
+        <div class="card">
+            <div class="profile-header">
+                <div class="avatar" id="p-avatar">P</div>
+                <div>
+                    <h1 style="margin:0; font-size: 2rem;">
+                        <span id="p-id">PID-...</span>
+                    </h1>
+                    <div style="margin-top: 5px; font-size: 1.1rem;">
+                        <span class="status-indicator" id="p-status-dot"></span>
+                        <span id="p-status-text" style="text-transform: uppercase; font-weight: bold;">Offline</span>
+                    </div>
+                </div>
+                
+                <div style="margin-left: auto; text-align: right;">
+                    <div style="font-size: 0.9rem; color: #94a3b8;">Predicted Engagement</div>
+                    <div id="p-engagement" style="font-size: 2.5rem; font-weight: 800;">LOADING</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="card">
+                <div class="card-title">Demographics</div>
+                <div style="line-height: 1.8;">
+                    <div><strong>Age:</strong> <span id="p-age">-</span></div>
+                    <div><strong>Gender:</strong> <span id="p-gender">-</span></div>
+                    <div><strong>Location:</strong> <span id="p-loc">-</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Session Stats</div>
+                <div style="line-height: 1.8;">
+                    <div><strong>Level:</strong> <span id="p-level" style="color: var(--accent); font-weight:bold;">-</span></div>
+                    <div><strong>Total Sessions:</strong> <span id="p-total-sess">-</span></div>
+                    <div><strong>Avg Duration:</strong> <span id="p-avg-sess" style="font-weight:bold; color:#fff;">-</span> min</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8; margin-top:5px;">
+                        Last Seen: <span id="p-last">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">In-Game Economy</div>
+                <div style="text-align: center; margin-top: 10px;">
+                    <div style="font-size: 0.9rem; color: #94a3b8;">Total Spent</div>
+                    <div id="p-spent" style="font-size: 2rem; font-weight: 800; color: #22c55e;">$0.00</div>
+                    <div style="margin-top: 5px; font-size: 0.9rem;">
+                        Items Bought: <span id="p-items-count" style="font-weight:bold;">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="rec-card" style="grid-column: 1 / -1;">
+                <div class="card-title">AI Recommendation</div>
+                <div id="rec-text">Analysis...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const pathParts = window.location.pathname.split('/');
+    const playerId = pathParts[pathParts.length - 1];
+
+    async function fetchPlayerData() {
+        try {
+            const res = await fetch(`/api/player/${playerId}`);
+            if(res.status === 404) {
+                document.getElementById('loading').innerText = "Player Not Found";
+                return;
+            }
+            const data = await res.json();
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+
+            // Basic Info
+            document.getElementById('p-id').innerText = data.player_id || playerId;
+            document.getElementById('p-avatar').innerText = (data.Gender === 'Female') ? '👩' : '👨';
+            
+            // Status
+            const isOnline = data.status === 'online';
+            const statusDot = document.getElementById('p-status-dot');
+            const statusText = document.getElementById('p-status-text');
+            statusDot.className = `status-indicator ${isOnline ? 'is-online' : 'is-offline'}`;
+            statusText.innerText = data.status || 'Offline';
+            statusText.style.color = isOnline ? 'var(--success)' : '#64748b';
+
+            // Demographics
+            document.getElementById('p-age').innerText = data.Age || 'N/A';
+            document.getElementById('p-gender').innerText = data.Gender || 'N/A';
+            document.getElementById('p-loc').innerText = data.Location || 'N/A';
+
+            // Gameplay Stats (Cập nhật Avg Session)
+            document.getElementById('p-level').innerText = data.PlayerLevel || '1';
+            document.getElementById('p-total-sess').innerText = data.TotalSessions || '0';
+            
+            // Format Avg Session (Làm tròn 1 chữ số thập phân)
+            const avgSess = parseFloat(data.AvgSessionDurationMinutes || 0).toFixed(1);
+            document.getElementById('p-avg-sess').innerText = avgSess;
+
+            // Time
+            document.getElementById('p-last').innerText = data.last_seen ? new Date(data.last_seen).toLocaleTimeString() : 'Never';
+
+            // ECONOMY (MỚI)
+            const totalSpent = parseFloat(data.TotalSpent || 0).toFixed(2);
+            document.getElementById('p-spent').innerText = `$${totalSpent}`;
+            document.getElementById('p-items-count').innerText = data.PurchaseCount || 0;
+
+            // AI & Recommendation
+            const engVal = data.EngagementLevel || 'Unknown';
+            const engEl = document.getElementById('p-engagement');
+            const recCard = document.getElementById('rec-card');
+            const recText = document.getElementById('rec-text');
+
+            engEl.innerText = engVal;
+            
+            // Reset style
+            recCard.className = 'card'; 
+            engEl.style.color = '#fff';
+
+            if(engVal === 'High') {
+                engEl.style.color = 'var(--danger)';
+                recText.innerHTML = `⚠️ <strong>Cảnh báo nghiện game:</strong> Player này có tần suất chơi cao (${avgSess}m/session). <br>Nên kích hoạt tính năng "Hệ thống mệt mỏi" giảm exp sau 3h chơi.`;
+                recCard.style.borderLeft = "4px solid var(--danger)";
+            } else if(engVal === 'Medium') {
+                engEl.style.color = 'var(--warning)';
+                recText.innerHTML = `⚖️ <strong>Khách hàng tiềm năng:</strong> Đã chi tiêu <strong>$${totalSpent}</strong>. <br>Đề xuất gửi popup khuyến mãi gói "Starter Pack 2" khi đăng nhập lần tới.`;
+                recCard.style.borderLeft = "4px solid var(--warning)";
+            } else {
+                engEl.style.color = 'var(--success)';
+                recText.innerText = "🌱 Người chơi mới hoặc ít hoạt động. Cần gửi thông báo đẩy (Push Notification) tặng quà để lôi kéo quay lại.";
+                recCard.style.borderLeft = "4px solid var(--success)";
+            }
+
+        } catch(e) {
+            console.error(e);
+        }
+    }
+
+    // Update real-time every 2 seconds
+    setInterval(fetchPlayerData, 2000);
+    fetchPlayerData();
+</script>
+
+</body>
+</html>

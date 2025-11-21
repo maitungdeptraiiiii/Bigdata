@@ -2,7 +2,8 @@ FROM apache/spark:3.5.1
 
 # cài pip packages
 USER root
-RUN pip install --no-cache-dir redis
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 RUN mkdir -p /home/spark/.ivy2/cache && chown -R spark:spark /home/spark/.ivy2
 
 USER spark

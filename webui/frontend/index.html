@@ -1,35 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Game Analytics Dashboard</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Analytics Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/frontend/style.css">
 </head>
 <body>
 
 <div class="container">
-  <h1>🎮 Game Analytics Realtime Dashboard</h1>
-
-  <div class="grid">
-    <div class="card" id="metrics-card">
-      <h2>Live Metrics</h2>
-      <div id="metrics"></div>
+    <div class="header">
+        <h1>🚀 Realtime Game Monitor</h1>
     </div>
 
-    <div class="card" id="events-card">
-      <h2>Recent Events</h2>
-      <div id="events" class="events-list"></div>
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="stat-value" id="val-online" style="color: #22c55e">0</div>
+            <div class="stat-label">Online Players</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="val-total">0</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="val-events" style="color: #3b82f6">0</div>
+            <div class="stat-label">Total Events</div>
+        </div>
     </div>
 
-    <div class="card" id="player-card">
-      <h2>Player Details</h2>
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+        
+        <div class="card">
+            <div class="card-title">🔴 Live Event Feed</div>
+            <ul class="log-list" id="event-log">
+                <li style="text-align:center; color: #94a3b8;">Waiting for events...</li>
+            </ul>
+        </div>
 
-      <select id="player-select"></select>
-      <pre id="player-details"></pre>
+        <div class="card">
+            <div class="card-title">🔍 Inspect Player</div>
+            <div class="search-container">
+                <select id="player-select">
+                    <option value="">-- Select a Player --</option>
+                </select>
+                <button class="go-btn" onclick="goToPlayer()">GO</button>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <div class="card-title">Active & Spenders</div>
+                <div id="quick-list"></div>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 
-<script src="app.js"></script>
+<script>
+    async function fetchStats() {
+        try {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+            document.getElementById('val-online').innerText = data.online_users;
+            document.getElementById('val-total').innerText = data.total_users;
+            document.getElementById('val-events').innerText = data.total_events;
+        } catch(e) { console.error(e); }
+    }
+
+    async function fetchEvents() {
+        try {
+            const res = await fetch('/api/events');
+            const events = await res.json();
+            const list = document.getElementById('event-log');
+            
+            list.innerHTML = events.map(e => {
+                // Highlight tiền nếu là purchase
+                let extraInfo = "";
+                if(e.type === 'purchase') {
+                    extraInfo = `<span style="color:#22c55e; font-weight:bold;">💰</span>`;
+                }
+                
+                return `
+                <li class="log-item">
+                    <span>
+                        ${extraInfo}
+                        <span style="color: var(--accent); font-weight:bold;">[${e.type.toUpperCase()}]</span> 
+                        Player <a href="/player/${e.id}" style="color:white; text-decoration:underline;">${e.id}</a>
+                    </span>
+                    <span style="color: #64748b; font-size: 0.85em;">${new Date(e.time).toLocaleTimeString()}</span>
+                </li>
+            `}).join('');
+        } catch(e) { console.error(e); }
+    }
+
+    async function loadPlayerList() {
+        try {
+            const res = await fetch('/api/players_list');
+            // API này trả về list object: {id, status, ...}
+            // Cần sửa backend 1 chút để trả thêm TotalSpent nếu muốn sort chuẩn, 
+            // nhưng ở đây ta cứ fetch chi tiết cho top list cũng được.
+            let players = await res.json();
+
+            // 1. Populate Dropdown
+            const select = document.getElementById('player-select');
+            select.innerHTML = '<option value="">-- Select a Player --</option>';
+            players.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.innerText = `${p.id} (${p.status})`;
+                select.appendChild(opt);
+            });
+
+            // 2. Quick List (Top 5 Online)
+            // Ta sẽ lấy thêm chi tiết để hiện tiền
+            const onlinePlayers = players.filter(p => p.status === 'online').slice(0, 5);
+            
+            // Parallel fetch detail để lấy tiền
+            const listHtml = await Promise.all(onlinePlayers.map(async (p) => {
+                const dRes = await fetch(`/api/player/${p.id}`);
+                const detail = await dRes.json();
+                const spent = parseFloat(detail.TotalSpent || 0).toFixed(2);
+                
+                return `
+                <div style="padding: 10px; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-weight:bold;">🟢 ${p.id}</div>
+                        <div style="font-size:0.8rem; color:#22c55e;">$${spent} spent</div>
+                    </div>
+                    <a href="/player/${p.id}" style="color: var(--accent); text-decoration:none; font-weight:bold;">View →</a>
+                </div>
+                `;
+            }));
+            
+            document.getElementById('quick-list').innerHTML = listHtml.join('') || '<div style="color:#64748b; text-align:center; padding:10px;">No active players</div>';
+
+        } catch(e) { console.error(e); }
+    }
+
+    function goToPlayer() {
+        const pid = document.getElementById('player-select').value;
+        if(pid) window.location.href = `/player/${pid}`;
+    }
+
+    // Refresh
+    setInterval(fetchStats, 2000);
+    setInterval(fetchEvents, 1500);
+    setInterval(loadPlayerList, 5000); // Refresh list chậm hơn chút
+
+    fetchStats();
+    fetchEvents();
+    loadPlayerList();
+</script>
+
 </body>
 </html>
