@@ -95,40 +95,51 @@
     async function loadPlayerList() {
         try {
             const res = await fetch('/api/players_list');
-            // API này trả về list object: {id, status, ...}
-            // Cần sửa backend 1 chút để trả thêm TotalSpent nếu muốn sort chuẩn, 
-            // nhưng ở đây ta cứ fetch chi tiết cho top list cũng được.
             let players = await res.json();
 
             // 1. Populate Dropdown
             const select = document.getElementById('player-select');
-            select.innerHTML = '<option value="">-- Select a Player --</option>';
-            players.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.id;
-                opt.innerText = `${p.id} (${p.status})`;
-                select.appendChild(opt);
-            });
+            
+            // [FIX] Chỉ cập nhật Dropdown nếu người dùng KHÔNG đang thao tác trên nó
+            if (document.activeElement !== select) {
+                // Lưu lại lựa chọn hiện tại (nếu có)
+                const currentSelection = select.value;
 
-            // 2. Quick List (Top 5 Online)
-            // Ta sẽ lấy thêm chi tiết để hiện tiền
+                // Xóa và tạo lại options
+                select.innerHTML = '<option value="">-- Select a Player --</option>';
+                players.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.innerText = `${p.id} (${p.status})`;
+                    select.appendChild(opt);
+                });
+
+                // [FIX] Khôi phục lại lựa chọn cũ sau khi render xong
+                if (currentSelection) {
+                    select.value = currentSelection;
+                }
+            }
+
+            // 2. Quick List (Top 5 Online & Spenders) - Phần này cập nhật liên tục ok
             const onlinePlayers = players.filter(p => p.status === 'online').slice(0, 5);
             
-            // Parallel fetch detail để lấy tiền
             const listHtml = await Promise.all(onlinePlayers.map(async (p) => {
-                const dRes = await fetch(`/api/player/${p.id}`);
-                const detail = await dRes.json();
-                const spent = parseFloat(detail.TotalSpent || 0).toFixed(2);
-                
-                return `
-                <div style="padding: 10px; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <div style="font-weight:bold;">🟢 ${p.id}</div>
-                        <div style="font-size:0.8rem; color:#22c55e;">$${spent} spent</div>
-                    </div>
-                    <a href="/player/${p.id}" style="color: var(--accent); text-decoration:none; font-weight:bold;">View →</a>
-                </div>
-                `;
+                // Lấy thêm info tiền nong nếu cần (đoạn này giữ nguyên logic cũ của bạn)
+                // Để tối ưu, nếu backend /api/players_list trả về totalSpent thì tốt, 
+                // còn ko thì fetch chi tiết như cũ:
+                try {
+                    const dRes = await fetch(`/api/player/${p.id}`);
+                    const detail = await dRes.json();
+                    const spent = parseFloat(detail.TotalSpent || 0).toFixed(2);
+                    return `
+                    <div style="padding: 10px; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-weight:bold;">🟢 ${p.id}</div>
+                            <div style="font-size:0.8rem; color:#22c55e;">$${spent} spent</div>
+                        </div>
+                        <a href="/player/${p.id}" style="color: var(--accent); text-decoration:none; font-weight:bold;">View →</a>
+                    </div>`;
+                } catch { return ""; }
             }));
             
             document.getElementById('quick-list').innerHTML = listHtml.join('') || '<div style="color:#64748b; text-align:center; padding:10px;">No active players</div>';

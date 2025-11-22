@@ -69,6 +69,8 @@ services:
       - PYSPARK_PYTHON=python3
     volumes:
       - ./spark/app:/app
+      - ./data:/data
+      - ./cv_pipeline_model:/app/cv_pipeline_model
     restart: unless-stopped
 
   # ===============================

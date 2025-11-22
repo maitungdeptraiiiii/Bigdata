@@ -49,14 +49,16 @@
             </div>
 
             <div class="card">
-                <div class="card-title">Session Stats</div>
+                <div class="card-title">Activity Stats</div>
                 <div style="line-height: 1.8;">
                     <div><strong>Level:</strong> <span id="p-level" style="color: var(--accent); font-weight:bold;">-</span></div>
+                    <div><strong>Total Time:</strong> <span id="p-total-time" style="color: #fff;">-</span></div>
+                    <div><strong>Achievements:</strong> 🏆 <span id="p-achievements" style="color: #eab308; font-weight:bold;">-</span></div>
+                    
+                    <hr style="border: 0; border-top: 1px solid #334155; margin: 8px 0;">
+                    
                     <div><strong>Total Sessions:</strong> <span id="p-total-sess">-</span></div>
-                    <div><strong>Avg Duration:</strong> <span id="p-avg-sess" style="font-weight:bold; color:#fff;">-</span> min</div>
-                    <div style="font-size: 0.8rem; color: #94a3b8; margin-top:5px;">
-                        Last Seen: <span id="p-last">-</span>
-                    </div>
+                    <div><strong>Avg Duration:</strong> <span id="p-avg-sess">-</span> min</div>
                 </div>
             </div>
             
@@ -72,7 +74,7 @@
             </div>
 
             <div class="card" id="rec-card" style="grid-column: 1 / -1;">
-                <div class="card-title">AI Recommendation</div>
+                <div class="card-title">AI Action Plan</div>
                 <div id="rec-text">Analysis...</div>
             </div>
         </div>
@@ -112,45 +114,47 @@
             document.getElementById('p-gender').innerText = data.Gender || 'N/A';
             document.getElementById('p-loc').innerText = data.Location || 'N/A';
 
-            // Gameplay Stats (Cập nhật Avg Session)
+            // --- GAMEPLAY STATS (UPDATED) ---
             document.getElementById('p-level').innerText = data.PlayerLevel || '1';
             document.getElementById('p-total-sess').innerText = data.TotalSessions || '0';
             
-            // Format Avg Session (Làm tròn 1 chữ số thập phân)
-            const avgSess = parseFloat(data.AvgSessionDurationMinutes || 0).toFixed(1);
-            document.getElementById('p-avg-sess').innerText = avgSess;
+            // Avg Session
+            document.getElementById('p-avg-sess').innerText = parseFloat(data.AvgSessionDurationMinutes || 0).toFixed(1);
 
-            // Time
-            document.getElementById('p-last').innerText = data.last_seen ? new Date(data.last_seen).toLocaleTimeString() : 'Never';
+            // Total Time (Convert Minutes -> Hours)
+            const totalMin = parseFloat(data.TotalPlayTimeMinutes || 0);
+            const totalHours = (totalMin / 60).toFixed(1);
+            document.getElementById('p-total-time').innerText = `${totalHours}h`;
 
-            // ECONOMY (MỚI)
+            // Achievements
+            document.getElementById('p-achievements').innerText = data.AchievementsCount || '0';
+
+            // --- ECONOMY ---
             const totalSpent = parseFloat(data.TotalSpent || 0).toFixed(2);
             document.getElementById('p-spent').innerText = `$${totalSpent}`;
             document.getElementById('p-items-count').innerText = data.PurchaseCount || 0;
 
-            // AI & Recommendation
+            // --- AI & RECOMMENDATION ---
             const engVal = data.EngagementLevel || 'Unknown';
             const engEl = document.getElementById('p-engagement');
             const recCard = document.getElementById('rec-card');
             const recText = document.getElementById('rec-text');
 
             engEl.innerText = engVal;
-            
-            // Reset style
             recCard.className = 'card'; 
             engEl.style.color = '#fff';
 
             if(engVal === 'High') {
                 engEl.style.color = 'var(--danger)';
-                recText.innerHTML = `⚠️ <strong>Cảnh báo nghiện game:</strong> Player này có tần suất chơi cao (${avgSess}m/session). <br>Nên kích hoạt tính năng "Hệ thống mệt mỏi" giảm exp sau 3h chơi.`;
+                recText.innerHTML = `⚠️ <strong>Nguy cơ cao:</strong> Đã chơi <strong>${totalHours}h</strong>. Cần kích hoạt giới hạn giờ chơi (Parental Control).`;
                 recCard.style.borderLeft = "4px solid var(--danger)";
             } else if(engVal === 'Medium') {
                 engEl.style.color = 'var(--warning)';
-                recText.innerHTML = `⚖️ <strong>Khách hàng tiềm năng:</strong> Đã chi tiêu <strong>$${totalSpent}</strong>. <br>Đề xuất gửi popup khuyến mãi gói "Starter Pack 2" khi đăng nhập lần tới.`;
+                recText.innerHTML = `⚖️ <strong>Ổn định:</strong> Đã mở khóa <strong>${data.AchievementsCount || 0}</strong> achievements. Đề xuất gửi quà khuyến khích leo rank.`;
                 recCard.style.borderLeft = "4px solid var(--warning)";
             } else {
                 engEl.style.color = 'var(--success)';
-                recText.innerText = "🌱 Người chơi mới hoặc ít hoạt động. Cần gửi thông báo đẩy (Push Notification) tặng quà để lôi kéo quay lại.";
+                recText.innerText = "🌱 Người chơi mới. Hãy gửi hướng dẫn tân thủ và quà tặng đăng nhập.";
                 recCard.style.borderLeft = "4px solid var(--success)";
             }
 
@@ -159,7 +163,6 @@
         }
     }
 
-    // Update real-time every 2 seconds
     setInterval(fetchPlayerData, 2000);
     fetchPlayerData();
 </script>
