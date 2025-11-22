@@ -1,0 +1,1 @@
+{"class":"org.apache.spark.ml.feature.StringIndexer","timestamp":1763750267953,"sparkVersion":"3.5.7","uid":"StringIndexer_dc799a756310","paramMap":{"inputCol":"GameGenre","outputCol":"GameGenre_idx","handleInvalid":"keep"},"defaultParamMap":{"stringOrderType":"frequencyDesc","handleInvalid":"error","outputCol":"StringIndexer_dc799a756310__output"}}
