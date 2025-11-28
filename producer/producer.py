@@ -109,8 +109,8 @@ def create_producer():
 
 def main():
     producer = create_producer()
-    print(">>> Waiting 10s...", flush=True)
-    time.sleep(10)
+    print(">>> Waiting 5s...", flush=True)
+    time.sleep(5)
 
     profiles = load_stratified_players()
     if not profiles: return
